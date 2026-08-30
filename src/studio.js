@@ -227,7 +227,7 @@ export async function generateAudioTrack({ genre, mood, era, vocal, energy, stor
   });
 
   const blob = audioBufferToWavBlob(rendered);
-  const audioUrl = URL.createObjectURL(blob);
+  const audioUrl = await blobToBase64(blob);
 
   return {
     waveform,
@@ -297,4 +297,14 @@ export async function startVoiceRecording() {
     stream,
     getBlob: () => new Blob(audioChunks, { type: 'audio/webm' }),
   };
+}
+
+async function blobToBase64(blob) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      resolve(reader.result);
+    };
+    reader.readAsDataURL(blob);
+  });
 }
