@@ -227,7 +227,13 @@ export async function generateAudioTrack({ genre, mood, era, vocal, energy, stor
   });
 
   const blob = audioBufferToWavBlob(rendered);
-  const audioUrl = await blobToBase64(blob);
+  let audioUrl;
+  try {
+    audioUrl = await blobToBase64(blob);
+  } catch (error) {
+    console.error('Base64 conversion failed, using blob URL:', error);
+    audioUrl = URL.createObjectURL(blob);
+  }
 
   return {
     waveform,
