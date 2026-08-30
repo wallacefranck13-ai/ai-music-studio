@@ -1,63 +1,62 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  buildExampleBrief,
+  buildPrompt,
+  createTrack,
+  eras,
+  generateAudioTrack,
+  genres,
+  moods,
+  vocals,
+} from './studio';
 
-const genres = [
-  'Afrobeats',
-  'Pop/Variété',
-  'Hip-Hop/Trap',
-  'EDM/Electro',
-  'Synthwave',
-  'Lo-Fi',
-  'Rock/Metal',
-  'Gospel',
-];
+const STORAGE_KEY = 'ai-music-studio-projects';
 
-const moods = ['Épique', 'Nostalgique', 'Festif', 'Mélancolique', 'Énergique', 'Céleste'];
-const eras = ['Moderne Hi-Fi', 'Analogique 80s', 'Lo-Fi Crackle', 'Acoustique Intimiste'];
-const vocals = ['Voix féminine pop', 'Voix masculine soul', 'Duo harmonisateur', 'Auto-Tune trap'];
+function readStoredProjects() {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      const example = buildExampleBrief();
+      return [
+        {
+          id: 'starter-project',
+          title: 'Projet starter',
+          story: example.story,
+          genre: example.genre,
+          mood: example.mood,
+          era: example.era,
+          vocal: example.vocal,
+          energy: example.energy,
+          savedAt: new Date().toISOString(),
+        },
+      ];
+    }
 
-function buildPrompt({ story, genre, mood, era, vocal, energy }) {
-  return [
-    `Concept: ${story}`,
-    `Genre: ${genre}`,
-    `Mood: ${mood}`,
-    `Texture: ${era}`,
-    `Voix: ${vocal}`,
-    `Énergie: ${energy}/100`,
-    'Structure: couplet, refrain, bridge, mixage dynamique, mastering pro.',
-  ].join(' | ');
-}
-
-function createTrack({ story, genre, mood, era, vocal, energy }) {
-  const trackId = `track_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-  const title = `${genre} ${mood} ${trackId.slice(-4)}`;
-
-  return {
-    status: 'success',
-    trackId,
-    metadata: {
-      title,
-      bpm: 118 + Math.round((energy / 100) * 18),
-      key: mood === 'Épique' ? 'A minor' : 'C major',
-      promptUsed: buildPrompt({ story, genre, mood, era, vocal, energy }),
-      masteringSpecs: '-14 LUFS, 24-bit 44.1kHz WAV',
-    },
-    media: {
-      previewMp3: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      masteredWav: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-      stemsZip: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    },
-  };
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (error) {
+    console.error('Unable to read saved projects', error);
+    return [];
+  }
 }
 
 export default function App() {
-  const [story, setStory] = useState('Une nuit à Lomé sous la pluie, pleine de souvenirs et d\'espoir.');
-  const [genre, setGenre] = useState('Afrobeats');
-  const [mood, setMood] = useState('Épique');
-  const [era, setEra] = useState('Moderne Hi-Fi');
-  const [vocal, setVocal] = useState('Voix féminine pop');
-  const [energy, setEnergy] = useState(78);
+  const example = buildExampleBrief();
+  const [story, setStory] = useState(example.story);
+  const [genre, setGenre] = useState(example.genre);
+  const [mood, setMood] = useState(example.mood);
+  const [era, setEra] = useState(example.era);
+  const [vocal, setVocal] = useState(example.vocal);
+  const [energy, setEnergy] = useState(example.energy);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
+  const [error, setError] = useState('');
+  const [projects, setProjects] = useState(() => readStoredProjects());
+  const [activeProjectId, setActiveProjectId] = useState('starter-project');
+
+  useEffect(() => {
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  }, [projects]);
 
   const quickStats = useMemo(
     () => [
@@ -68,14 +67,133 @@ export default function App() {
     [],
   );
 
-  const handleGenerate = () => {
-    if (!story.trim()) return;
+  const applyExample = () => {
+    const template = buildExampleBrief();
+    setStory(template.story);
+    setGenre(template.genre);
+    setMood(template.mood);
+    setEra(template.era);
+    setVocal(template.vocal);
+    setEnergy(template.energy);
+    setError('');
+  };
+
+  const saveCurrentProject = () => {
+    const trimmedStory = story.trim();
+    const title = trimmedStory
+      ? trimmedStory.split(/\s+/).slice(0, 4).join(' ') || 'Nouveau projet'
+      : 'Nouveau projet';
+
+    const entry = {
+      id: activeProjectId || `project-${Date.now()}`,
+      title: title.length > 30 ? `${title.slice(0, 27)}...` : title,
+      story: trimmedStory || example.story,
+      genre,
+      mood,
+      era,
+      vocal,
+      energy,
+      savedAt: new Date().toISOString(),
+    };
+
+    setProjects((current) => {
+      const exists = current.some((project) => project.id === entry.id);
+      if (exists) {
+        return current.map((project) => (project.id === entry.id ? entry : project));
+      }
+      return [entry, ...current];
+    });
+
+    setActiveProjectId(entry.id);
+  };
+
+  const loadProject = (project) => {
+    setStory(project.story);
+    setGenre(project.genre);
+    setMood(project.mood);
+    setEra(project.era);
+    setVocal(project.vocal);
+    setEnergy(project.energy);
+    setActiveProjectId(project.id);
+    setResult(null);
+    setError('');
+  };
+
+  const deleteProject = (projectId) => {
+    setProjects((current) => current.filter((project) => project.id !== projectId));
+    if (activeProjectId === projectId) {
+      setActiveProjectId(null);
+    }
+  };
+
+  const downloadAudio = () => {
+    if (!result?.media?.previewMp3) return;
+    const anchor = document.createElement('a');
+    anchor.href = result.media.previewMp3;
+    anchor.download = `${(result.metadata.title || 'ai-music-track').toLowerCase().replace(/\s+/g, '-')}.wav`;
+    anchor.click();
+  };
+
+  const downloadProjectJson = () => {
+    const payload = {
+      title: result?.metadata?.title || 'ai-music-studio-project',
+      createdAt: new Date().toISOString(),
+      story,
+      genre,
+      mood,
+      era,
+      vocal,
+      energy,
+      prompt: buildPrompt({ story, genre, mood, era, vocal, energy }),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${payload.title.toLowerCase().replace(/\s+/g, '-')}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleGenerate = async () => {
+    const trimmedStory = story.trim();
+    if (!trimmedStory) {
+      setError('Racontez un peu plus votre histoire pour générer une piste.');
+      return;
+    }
+
+    setError('');
     setLoading(true);
-    setTimeout(() => {
-      const data = createTrack({ story, genre, mood, era, vocal, energy });
-      setResult(data);
+
+    try {
+      const generatedAudio = await generateAudioTrack({
+        story: trimmedStory,
+        genre,
+        mood,
+        era,
+        vocal,
+        energy,
+      });
+
+      const data = createTrack({ story: trimmedStory, genre, mood, era, vocal, energy });
+      const finalData = {
+        ...data,
+        media: generatedAudio.media,
+        metadata: {
+          ...data.metadata,
+          ...generatedAudio.metadata,
+        },
+        waveform: generatedAudio.waveform,
+      };
+
+      setResult(finalData);
+    } catch (errorMessage) {
+      setError('La génération audio a échoué. Réessayez avec un autre brief.');
+      console.error(errorMessage);
+    } finally {
       setLoading(false);
-    }, 900);
+    }
   };
 
   return (
@@ -108,13 +226,7 @@ export default function App() {
                 <p className="eyebrow">Briefing</p>
                 <h2>Studio de création</h2>
               </div>
-              <button
-                type="button"
-                className="ghost-button"
-                onClick={() =>
-                  setStory("Une nuit à Lomé sous la pluie, pleine de souvenirs et d'espoir.")
-                }
-              >
+              <button type="button" className="ghost-button" onClick={applyExample}>
                 Exemple
               </button>
             </div>
@@ -201,6 +313,8 @@ export default function App() {
                 </label>
               </div>
 
+              {error ? <div className="error-box">{error}</div> : null}
+
               <button
                 type="button"
                 className="primary-button"
@@ -218,9 +332,37 @@ export default function App() {
                 <p className="eyebrow">Sortie</p>
                 <h2>Piste générée</h2>
               </div>
-              {result?.status === 'success' ? (
-                <span className="status-badge">Ready</span>
-              ) : null}
+              {result?.status === 'success' ? <span className="status-badge">Ready</span> : null}
+            </div>
+
+<div className="project-manager">
+              <div className="section-heading compact-heading">
+                <div>
+                  <p className="eyebrow">Projets</p>
+                  <h3>Mes briefs</h3>
+                </div>
+                <button type="button" className="ghost-button" onClick={saveCurrentProject}>
+                  Enregistrer
+                </button>
+              </div>
+
+              <div className="project-list">
+                {projects.length === 0 ? (
+                  <div className="empty-projects">Aucun projet enregistré.</div>
+                ) : (
+                  projects.map((project) => (
+                    <div key={project.id} className={project.id === activeProjectId ? 'project-row active' : 'project-row'}>
+                      <button type="button" className="project-load" onClick={() => loadProject(project)}>
+                        <strong>{project.title}</strong>
+                        <span>{project.genre} • {project.mood}</span>
+                      </button>
+                      <button type="button" className="project-delete" onClick={() => deleteProject(project.id)} aria-label="Supprimer le projet">
+                        ×
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
 
             {result ? (
@@ -230,6 +372,7 @@ export default function App() {
                     <span>Mastered</span>
                     <span>{result.metadata.bpm} BPM</span>
                   </div>
+
                   <div className="wave-main">
                     <div className="play-icon">▶</div>
                     <div>
@@ -237,9 +380,15 @@ export default function App() {
                       <div className="track-sub">{result.metadata.key}</div>
                     </div>
                   </div>
-                  <div className="progress-bar">
-                    <span />
+
+                  <audio controls src={result.media.previewMp3} className="audio-player" />
+
+                  <div className="wave-visual" aria-label="Visualisation du signal audio">
+                    {result.waveform.map((height, index) => (
+                      <span key={`${height}-${index}`} style={{ height: `${height}%` }} />
+                    ))}
                   </div>
+
                   <div className="wave-labels">
                     <span>Intro</span>
                     <span>Refrain</span>
@@ -257,20 +406,20 @@ export default function App() {
                     <strong>{vocal}</strong>
                   </div>
                   <div>
-                    <span>Identifiant</span>
-                    <strong>{result.trackId}</strong>
+                    <span>Durée</span>
+                    <strong>{result.metadata.duration}</strong>
+                  </div>
+                  <div>
+                    <span>Prompt</span>
+                    <strong className="prompt-box">{buildPrompt({ story, genre, mood, era, vocal, energy })}</strong>
                   </div>
                 </div>
 
                 <div className="actions-grid">
+                  <button type="button" onClick={downloadAudio}>Télécharger WAV</button>
+                  <button type="button" onClick={downloadProjectJson}>Exporter JSON</button>
                   <a href={result.media.previewMp3} target="_blank" rel="noreferrer">
                     Preview MP3
-                  </a>
-                  <a href={result.media.masteredWav} target="_blank" rel="noreferrer">
-                    WAV Master
-                  </a>
-                  <a href={result.media.stemsZip} target="_blank" rel="noreferrer">
-                    Stems ZIP
                   </a>
                 </div>
               </div>
