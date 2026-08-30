@@ -258,3 +258,43 @@ export function buildExampleBrief() {
     energy: 78,
   };
 }
+
+export function synthesizeVoice(text, voiceType) {
+  return new Promise((resolve) => {
+    if (!('speechSynthesis' in window)) {
+      resolve(null);
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 0.9;
+    utterance.pitch = voiceType.includes('féminine') ? 1.3 : 0.9;
+    utterance.volume = 0.8;
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const isFemale = voiceType.includes('féminine');
+      const voice = voices.find((v) => (isFemale ? v.name.includes('Female') || v.name.includes('female') : true)) || voices[0];
+      utterance.voice = voice;
+    }
+    utterance.onend = () => resolve(true);
+    window.speechSynthesis.speak(utterance);
+  });
+}
+
+export async function startVoiceRecording() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  const mediaRecorder = new MediaRecorder(stream);
+  const audioChunks = [];
+  mediaRecorder.ondataavailable = (event) => {
+    audioChunks.push(event.data);
+  };
+  mediaRecorder.onstop = () => {
+    stream.getTracks().forEach((track) => track.stop());
+  };
+  mediaRecorder.start();
+  return {
+    mediaRecorder,
+    audioChunks,
+    stream,
+    getBlob: () => new Blob(audioChunks, { type: 'audio/webm' }),
+  };
+}

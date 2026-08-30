@@ -7,6 +7,8 @@ import {
   generateAudioTrack,
   genres,
   moods,
+  startVoiceRecording,
+  synthesizeVoice,
   vocals,
 } from './studio';
 
@@ -53,6 +55,8 @@ export default function App() {
   const [error, setError] = useState('');
   const [projects, setProjects] = useState(() => readStoredProjects());
   const [activeProjectId, setActiveProjectId] = useState('starter-project');
+  const [isRecording, setIsRecording] = useState(false);
+  const [recorder, setRecorder] = useState(null);
 
   useEffect(() => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
@@ -123,6 +127,35 @@ export default function App() {
     setProjects((current) => current.filter((project) => project.id !== projectId));
     if (activeProjectId === projectId) {
       setActiveProjectId(null);
+    }
+  };
+
+  const startRecording = async () => {
+    try {
+      const rec = await startVoiceRecording();
+      setRecorder(rec);
+      setIsRecording(true);
+    } catch (err) {
+      setError('Impossible d\'accéder au micro.');
+      console.error(err);
+    }
+  };
+
+  const stopRecording = () => {
+    if (recorder) {
+      recorder.mediaRecorder.stop();
+      setIsRecording(false);
+      setTimeout(() => {
+        const blob = recorder.getBlob();
+        if (blob) {
+          const url = URL.createObjectURL(blob);
+          const audio = new Audio(url);
+          audio.onloadedmetadata = () => {
+            setStory(`[Enregistrement vocal] ${new Date().toLocaleTimeString()}`);
+          };
+          audio.play();
+        }
+      }, 300);
     }
   };
 
@@ -232,15 +265,24 @@ export default function App() {
             </div>
 
             <div className="field-stack">
-              <label className="field">
+              <div className="field">
                 <span>1. Votre histoire</span>
-                <textarea
-                  value={story}
-                  onChange={(e) => setStory(e.target.value)}
-                  rows={5}
-                  placeholder="Ex : Une soirée inoubliable sous les étoiles à Lomé..."
-                />
-              </label>
+                <div className="voice-input-group">
+                  <textarea
+                    value={story}
+                    onChange={(e) => setStory(e.target.value)}
+                    rows={5}
+                    placeholder="Ex : Une soirée inoubliable sous les étoiles à Lomé..."
+                  />
+                  <button
+                    type="button"
+                    className={isRecording ? 'voice-button recording' : 'voice-button'}
+                    onClick={isRecording ? stopRecording : startRecording}
+                  >
+                    {isRecording ? '⏹ Arrêter' : '🎤 Enregistrer'}
+                  </button>
+                </div>
+              </div>
 
               <div className="field">
                 <span>2. Style musical</span>

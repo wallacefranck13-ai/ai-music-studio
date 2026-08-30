@@ -507,6 +507,60 @@ button {
   text-align: center;
 }
 
+.error-box {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.32);
+  color: #fecaca;
+  font-size: 0.86rem;
+}
+
+.voice-input-group {
+  display: flex;
+  gap: 12px;
+  align-items: flex-end;
+}
+
+.voice-input-group textarea {
+  flex: 1;
+}
+
+.voice-button {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(59, 130, 246, 0.12);
+  color: #93c5fd;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.voice-button:hover {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(93, 165, 254, 0.5);
+}
+
+.voice-button.recording {
+  background: rgba(239, 68, 68, 0.2);
+  border-color: rgba(252, 113, 113, 0.5);
+  color: #fca5a5;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
 @media (max-width: 900px) {
   .hero-card,
   .studio-grid {
